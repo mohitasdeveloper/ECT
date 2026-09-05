@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - EcoVities</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/394HcGWn/Eco-Birla-3-modified.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css"> 
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { inter: ['Inter', 'sans-serif'], jakarta: ['Plus Jakarta Sans', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 font-inter h-[100dvh] flex items-center justify-center p-4 relative overflow-hidden">
+    
+    <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-green-400/20 dark:bg-green-600/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-3xl"></div>
+
+    <div class="glass-card w-full max-w-md p-8 rounded-3xl relative z-10 shadow-2xl">
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 mx-auto bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center shadow-md mb-4 border border-gray-100 dark:border-gray-700">
+                <i data-lucide="leaf" class="w-8 h-8 text-green-500"></i>
+            </div>
+            <h1 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[#1E8F45] via-[#007DC5] to-[#7128A3] tracking-tight mb-2">EcoVities</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Sign in to your Master Account</p>
+        </div>
+
+        <form id="login-form" class="space-y-5">
+            <div>
+                <label for="email" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">College Email</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i data-lucide="mail" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <input type="email" id="email" required class="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all dark:text-white" placeholder="student@bkbirla.edu">
+                </div>
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Password</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i data-lucide="lock" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <input type="password" id="password" required class="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all dark:text-white" placeholder="••••••••">
+                </div>
+            </div>
+
+            <div id="error-message" class="hidden bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm font-medium border border-red-100 dark:border-red-800/50 flex items-start gap-2">
+                <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+                <span id="error-text">Login failed.</span>
+            </div>
+
+            <button type="submit" id="login-btn" class="w-full btn-eco-gradient text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 mt-4">
+                <span>Sign In</span>
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const savedTheme = localStorage.getItem('eco-theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+        lucide.createIcons();
+    </script>
+    
+    <script type="module" src="login.js"></script>
+</body>
+</html>

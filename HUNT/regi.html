@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Treasure Hunt Registration</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        :root {
+            /* Material 3 Light Theme */
+            --bg-color: #F0F4F8;
+            --surface-color: #FFFFFF;
+            --surface-container: #F1F3F4;
+            --primary-color: #0B57D0;
+            --primary-hover: #0842A0;
+            --on-primary: #FFFFFF;
+            --primary-container: #D3E3FD;
+            --on-primary-container: #041E49;
+            --text-primary: #1F1F1F;
+            --text-secondary: #444746;
+            --border-color: #E0E2E0;
+            --danger-color: #B3261E;
+            --danger-container: #F9DEDC;
+            --on-danger-container: #410E0B;
+            --success-color: #146C2E;
+            --success-container: #C4EED0;
+            --overlay-color: rgba(0, 0, 0, 0.4);
+            --shadow-elevation: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="dark"] {
+            /* Material 3 Dark Theme */
+            --bg-color: #131314;
+            --surface-color: #1E1F20;
+            --surface-container: #2D2F31;
+            --primary-color: #A8C7FA;
+            --primary-hover: #D3E3FD;
+            --on-primary: #000000;
+            --primary-container: #004A77;
+            --on-primary-container: #C2E7FF;
+            --text-primary: #E3E3E3;
+            --text-secondary: #C4C7C5;
+            --border-color: #444746;
+            --danger-color: #F2B8B5;
+            --danger-container: #8C1D18;
+            --on-danger-container: #F9DEDC;
+            --success-color: #81C995;
+            --success-container: #0F5223;
+            --overlay-color: rgba(0, 0, 0, 0.7);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+       body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            /* Safe area spacing for mobile status bar / notch */
+            padding: calc(env(safe-area-inset-top, 24px) + 16px) 0 16px 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Material 3 Cards */
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow-elevation);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1, h2 { font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+        p { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; line-height: 1.5; }
+
+        /* Countdown Timer Styles */
+        .countdown-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .time-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--surface-container);
+            padding: 12px 16px;
+            border-radius: 16px;
+            min-width: 76px;
+        }
+        .time-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+            line-height: 1.1;
+        }
+        .time-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Stats Header */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .stat-box {
+            background: var(--surface-container);
+            padding: 16px;
+            border-radius: 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .stat-value { font-size: 24px; font-weight: 700; color: var(--primary-color); }
+        .stat-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Inputs & Buttons */
+        input[type="text"] {
+            width: 100%;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-container);
+            color: var(--text-primary);
+            font-size: 16px;
+            margin-bottom: 16px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        input[type="text"]:focus {
+            background: var(--surface-color);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px var(--primary-container);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            border-radius: 100px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .btn-primary { background-color: var(--primary-color); color: var(--on-primary); }
+        .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+        
+        .btn-danger { background-color: var(--danger-color); color: var(--on-primary); }
+        .btn-danger:hover { opacity: 0.9; }
+
+        .btn-tonal { background-color: var(--primary-container); color: var(--on-primary-container); }
+        .btn-tonal:hover { filter: brightness(0.95); }
+
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
+        
+        /* Icon Button */
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            padding: 0;
+            background: transparent;
+            color: var(--danger-color);
+            transition: background 0.2s;
+        }
+        .btn-icon:hover { background: var(--danger-container); color: var(--on-danger-container); }
+        
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Lists & Avatars */
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 16px;
+            background: var(--surface-container);
+            transition: transform 0.2s;
+        }
+        .list-item:hover { transform: translateX(2px); }
+        
+        .badge {
+            background: var(--primary-container);
+            color: var(--on-primary-container);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--border-color);
+            margin-right: 12px;
+            vertical-align: middle;
+        }
+        .member-info { display: flex; align-items: center; }
+
+        /* Custom Modal (In-App Confirmation) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--overlay-color);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: var(--surface-color);
+            width: 90%;
+            max-width: 360px;
+            border-radius: 28px;
+            padding: 24px;
+            transform: scale(0.95) translateY(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12);
+        }
+        .modal-overlay.active .modal-card { transform: scale(1) translateY(0); }
+        
+        .modal-icon {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            margin-bottom: 16px;
+        }
+        .modal-icon.warning { background: var(--danger-container); color: var(--danger-color); }
+        .modal-icon.info { background: var(--primary-container); color: var(--primary-color); }
+
+        .modal-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+
+        /* Views */
+        .view { display: none; animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Toast */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--text-primary);
+            color: var(--bg-color);
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 3000;
+            box-shadow: var(--shadow-elevation);
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        .material-symbols-rounded { vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Loading View -->
+        <div id="view-loading" class="view active">
+            <div class="card" style="text-align: center; padding: 40px 20px;">
+                <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary-color); margin-bottom: 16px; animation: spin 2s linear infinite;">hourglass_empty</span>
+                <h2>Loading Event Data...</h2>
+            </div>
+        </div>
+
+        <!-- Dynamic Closed View (Countdown, Closed, or Full) -->
+        <div id="view-closed" class="view">
+            <div class="card" style="text-align: center; padding: 40px 24px;">
+                <span id="closed-icon" class="material-symbols-rounded" style="font-size: 56px; margin-bottom: 16px;"></span>
+                <h2 id="closed-title">Registration Status</h2>
+                <p id="closed-msg">Loading details...</p>
+                
+                <!-- Live Countdown Container -->
+                <div id="countdown-container" class="countdown-wrapper" style="display: none;">
+                    <div class="time-box">
+                        <span class="time-value" id="cd-hours">00</span>
+                        <span class="time-label">HRS</span>
+                    </div>
+                    <div class="time-box">
+                        <span class="time-value" id="cd-mins">00</span>
+                        <span class="time-label">MIN</span>
+                    </div>
+                    <div class="time-box">
+                        <span class="time-value" id="cd-secs">00</span>
+                        <span class="time-label">SEC</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby View -->
+        <div id="view-lobby" class="view">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-value"><span id="stat-locked-teams">0</span> / <span id="stat-max-teams">20</span></span>
+                    <span class="stat-label">Registered Teams</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-value" id="stat-open-teams">0</span>
+                    <span class="stat-label">Teams Forming</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><span class="material-symbols-rounded">group_add</span> Create Team</h2>
+                <p>Start a new squad and become the Leader.</p>
+                <input type="text" id="new-team-name" placeholder="Enter awesome team name...">
+                <button class="btn-primary" onclick="createTeam()" id="btn-create">Create Team</button>
+            </div>
+
+            <div class="card" style="margin-top: 24px;">
+                <h2><span class="material-symbols-rounded">search</span> Join a Team</h2>
+                <input type="text" id="search-team" placeholder="Search public teams..." oninput="filterTeams()">
+                <div id="public-teams-list" style="margin-top: 16px;">
+                    <!-- Teams injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- My Team View -->
+        <div id="view-my-team" class="view">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h2 id="my-team-name" style="font-size: 24px; margin-bottom: 4px;">Team Name</h2>
+                        <p id="team-status" style="font-weight: 500; font-size: 13px; display: flex; align-items: center; gap: 4px;"></p>
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 12px;">
+                    <h3 style="font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Members</h3>
+                    <span style="font-size: 14px; font-weight: 600; color: var(--primary-color); background: var(--primary-container); padding: 4px 12px; border-radius: 100px;"><span id="member-count">0</span>/5</span>
+                </div>
+                
+                <div id="members-list">
+                    <!-- Members injected here -->
+                </div>
+
+                <div id="team-actions" style="margin-top: 32px; display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Action buttons injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced In-App Confirmation Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div id="modal-icon-container" class="modal-icon warning">
+                <span id="modal-icon" class="material-symbols-rounded" style="font-size: 28px;">warning</span>
+            </div>
+            <h2 id="modal-title" style="font-size: 22px;">Confirm Action</h2>
+            <p id="modal-desc" style="margin-top: 8px;">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" class="btn-primary">Confirm</button>
+                <button class="btn-tonal" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast">Message</div>
+
+    <script>
+        // 1. Initialize App & URL Params
+        const SUPABASE_URL = 'https://jdrksqtrznmuuwkmbvqp.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_ywElqkUc0IFMha8ld6xe2A_xs5FrD2S';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawStudentId = urlParams.get('student_id');
+
+        let realStudentId = null;
+        if (rawStudentId) {
+            realStudentId = (parseInt(rawStudentId, 10) - 5489).toString();
+        }
+
+        const user = {
+            id: realStudentId,
+            name: urlParams.get('name'),
+            theme: urlParams.get('theme') || 'light'
+        };
+
+        if (user.theme === 'dark') document.body.setAttribute('data-theme', 'dark');
+
+        let allPublicTeams = [];
+        let currentTeam = null;
+        let pendingAction = null; 
+        let countdownInterval = null;
+
+        // TARGET DATE FOR REGISTRATION TO OPEN (Sept 4, 2026 @ 3:00 PM IST)
+        const OPENING_TIME = new Date("2026-09-04T15:00:00+05:30").getTime();
+
+        // 2. Main Initialization Logic
+        async function init() {
+            if (!user.id || !user.name) return showToast("Missing Student ID or Name in URL.");
+
+            const now = new Date().getTime();
+
+            // PRIORITY 1: Check if it's before 3:00 PM. If so, block everything and show timer.
+            if (now < OPENING_TIME) {
+                document.getElementById('closed-icon').innerText = 'timer';
+                document.getElementById('closed-icon').style.color = 'var(--primary-color)';
+                document.getElementById('closed-title').innerText = "Registration Opens Soon";
+                document.getElementById('closed-msg').innerText = "The Treasure Hunt lobby will open at exactly 3:00 PM IST.";
+                startCountdown();
+                return switchView('view-closed');
+            }
+
+            // PRIORITY 2: It is past 3 PM. Fetch settings from DB to see if admin opened it.
+            const { data: settings } = await supabaseClient.from('game_settings').select('*').single();
+            const { count: lockedCount } = await supabaseClient.from('teams').select('*', { count: 'exact', head: true }).eq('is_locked', true);
+
+            // Hide countdown container just in case it was visible
+            document.getElementById('countdown-container').style.display = 'none';
+
+            // Check if admin manually closed/paused registration
+            if (!settings.is_registration_open) {
+                document.getElementById('closed-icon').innerText = 'block';
+                document.getElementById('closed-icon').style.color = 'var(--danger-color)';
+                document.getElementById('closed-title').innerText = "Registration Closed";
+                document.getElementById('closed-msg').innerText = "The admin has paused or closed the registration.";
+                return switchView('view-closed');
+            }
+
+            // Check if limit reached
+            if (lockedCount >= settings.max_teams) {
+                document.getElementById('closed-icon').innerText = 'group_off';
+                document.getElementById('closed-icon').style.color = 'var(--danger-color)';
+                document.getElementById('closed-title').innerText = "Event is Full";
+                document.getElementById('closed-msg').innerText = "The maximum limit of locked teams has already been reached.";
+                return switchView('view-closed');
+            }
+
+            // PRIORITY 3: Registration is Open! Check user membership.
+            const { data: membership } = await supabaseClient.from('team_members').select('team_id').eq('student_id', user.id).single();
+
+            if (membership) await loadMyTeam(membership.team_id);
+            else await loadLobby(settings.max_teams, lockedCount);
+
+            setupRealtimeSubscription();
+        }
+
+        // Countdown Logic
+        function startCountdown() {
+            document.getElementById('countdown-container').style.display = 'flex';
+            
+            countdownInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const distance = OPENING_TIME - now;
+
+                if (distance <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('cd-hours').innerText = "00";
+                    document.getElementById('cd-mins').innerText = "00";
+                    document.getElementById('cd-secs').innerText = "00";
+                    document.getElementById('closed-msg').innerText = "Time's up! Reloading the lobby...";
+                    
+                    // Auto-reload the page exactly when countdown ends to check database status
+                    setTimeout(() => window.location.reload(), 2000);
+                    return;
+                }
+
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                document.getElementById('cd-hours').innerText = hours.toString().padStart(2, '0');
+                document.getElementById('cd-mins').innerText = minutes.toString().padStart(2, '0');
+                document.getElementById('cd-secs').innerText = seconds.toString().padStart(2, '0');
+            }, 1000);
+        }
+
+        function setupRealtimeSubscription() {
+            supabaseClient.channel('db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, handleRealtimeUpdate)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, handleRealtimeUpdate)
+                .subscribe();
+        }
+
+        async function handleRealtimeUpdate() {
+            if (currentTeam) {
+                await loadMyTeam(currentTeam.id); 
+            } else {
+                // If in lobby, silently update data without breaking UI
+                const { data: teams } = await supabaseClient.from('teams').select('*, team_members(count)');
+                const lockedCount = teams.filter(t => t.is_locked).length;
+                allPublicTeams = teams.filter(t => !t.is_locked);
+                
+                document.getElementById('stat-locked-teams').innerText = lockedCount;
+                document.getElementById('stat-open-teams').innerText = allPublicTeams.length;
+                
+                filterTeams(); 
+            }
+        }
+
+        // 3. UI Helpers
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function showModal(title, desc, btnClass, icon, iconTheme, actionCallback) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            confirmBtn.className = btnClass;
+            
+            document.getElementById('modal-icon').innerText = icon;
+            document.getElementById('modal-icon-container').className = `modal-icon ${iconTheme}`;
+            
+            pendingAction = actionCallback;
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            pendingAction = null;
+        }
+
+        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+            if (pendingAction) pendingAction();
+            closeModal();
+        });
+
+        // 4. Lobby Logic
+        async function loadLobby(maxTeams, lockedCount) {
+            currentTeam = null;
+            switchView('view-lobby');
+            
+            const { data: teams } = await supabaseClient.from('teams').select('*, team_members(count)').eq('is_locked', false);
+            allPublicTeams = teams || [];
+            
+            // Set Stats
+            document.getElementById('stat-max-teams').innerText = maxTeams;
+            document.getElementById('stat-locked-teams').innerText = lockedCount;
+            document.getElementById('stat-open-teams').innerText = allPublicTeams.length;
+
+            renderTeamsList(allPublicTeams);
+        }
+
+        function filterTeams() {
+            const query = document.getElementById('search-team').value.toLowerCase();
+            const filtered = allPublicTeams.filter(t => t.name.toLowerCase().includes(query));
+            renderTeamsList(filtered);
+        }
+
+        function renderTeamsList(teams) {
+            const container = document.getElementById('public-teams-list');
+            if (teams.length === 0) {
+                container.innerHTML = `<p style="text-align:center; padding: 20px;">No open teams found.</p>`;
+                return;
+            }
+
+            container.innerHTML = teams.map(t => {
+                const count = t.team_members[0].count;
+                return `
+                <div class="list-item">
+                    <div>
+                        <strong style="font-size: 15px;">${t.name}</strong><br>
+                        <span style="font-size:12px; color:var(--text-secondary)">${count}/5 Members</span>
+                    </div>
+                    ${count < 5 ? `<button class="btn-tonal" style="width:auto; padding: 8px 20px; font-size: 13px;" onclick="joinTeam('${t.id}')">Join</button>` : `<span style="font-size:12px; color:var(--danger-color); font-weight:600;">Full</span>`}
+                </div>
+                `;
+            }).join('');
+        }
+
+        // 5. Team RPC Actions
+        async function createTeam() {
+            const name = document.getElementById('new-team-name').value.trim();
+            if (!name) return showToast('Enter a team name');
+            document.getElementById('btn-create').disabled = true;
+
+            const { data, error } = await supabaseClient.rpc('create_team', {
+                p_team_name: name, p_student_id: user.id, p_student_name: user.name
+            });
+
+            if (error) { showToast(error.message); document.getElementById('btn-create').disabled = false; } 
+            else await loadMyTeam(data);
+        }
+
+        async function joinTeam(teamId) {
+            const { error } = await supabaseClient.rpc('join_team', {
+                p_team_id: teamId, p_student_id: user.id, p_student_name: user.name
+            });
+            if (error) showToast(error.message);
+            else await loadMyTeam(teamId);
+        }
+
+        // 6. My Team Logic
+        async function loadMyTeam(teamId) {
+            const { data: team } = await supabaseClient.from('teams').select('*').eq('id', teamId).single();
+            if (!team) { showToast("This team was deleted."); return init(); }
+
+            const { data: members } = await supabaseClient.from('team_members').select('*').eq('team_id', teamId);
+            if (!members.find(m => m.student_id === user.id)) return init();
+
+            currentTeam = team;
+            switchView('view-my-team');
+
+            const isLeader = user.id === team.captain_id;
+
+            document.getElementById('my-team-name').innerText = team.name;
+            const statusEl = document.getElementById('team-status');
+            
+            if(team.is_locked) {
+                statusEl.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">lock</span> Registered & Locked`;
+                statusEl.style.color = 'var(--success-color)';
+            } else {
+                statusEl.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">lock_open_right</span> Forming Team`;
+                statusEl.style.color = 'var(--primary-color)';
+            }
+            
+            document.getElementById('member-count').innerText = members.length;
+
+            // Render Members
+            document.getElementById('members-list').innerHTML = members.map(m => `
+                <div class="list-item">
+                    <div class="member-info">
+                        <img class="avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(m.student_name)}&backgroundColor=0b57d0" alt="avatar">
+                        <span>
+                            ${m.student_name} 
+                            ${m.student_id === team.captain_id ? '<span class="badge">Leader</span>' : ''}
+                        </span>
+                    </div>
+                    ${isLeader && m.student_id !== team.captain_id && !team.is_locked ? 
+                        `<button class="btn-icon" onclick="promptRemoveMember('${m.student_id}', '${m.student_name}')">
+                            <span class="material-symbols-rounded" style="font-size: 22px;">person_remove</span>
+                         </button>` : ''
+                    }
+                </div>
+            `).join('');
+
+            renderTeamActions(team, members.length, isLeader);
+        }
+
+        function renderTeamActions(team, memberCount, isLeader) {
+            const actions = document.getElementById('team-actions');
+
+            if (team.is_locked) {
+                actions.innerHTML = `
+                <div style="background: var(--success-container); padding: 16px; border-radius: 16px; text-align: center; color: var(--success-color);">
+                    <span class="material-symbols-rounded" style="font-size: 32px; margin-bottom: 8px;">verified</span>
+                    <p style="margin:0; font-weight: 600; color: inherit;">Your team is officially registered!</p>
+                </div>`;
+                return;
+            }
+
+            let html = '';
+            if (isLeader) {
+                if (memberCount === 5) {
+                    html += `<button class="btn-primary" onclick="promptLockTeam('${team.id}')"><span class="material-symbols-rounded">verified</span> Submit & Lock Team</button>`;
+                } else {
+                    html += `
+                    <div style="background: var(--surface-container); padding: 16px; border-radius: 16px; text-align: center;">
+                        <span class="material-symbols-rounded" style="color: var(--primary-color); font-size: 28px; margin-bottom: 4px;">group_add</span>
+                        <p style="margin:0; font-weight: 500; font-size: 13px;">Waiting for ${5 - memberCount} more members to join...</p>
+                    </div>`;
+                }
+                html += `<button class="btn-outline" style="color: var(--danger-color); border-color: transparent;" onclick="promptDeleteTeam('${team.id}')">Delete Team</button>`;
+            } else {
+                html += `<button class="btn-danger" onclick="promptLeaveTeam('${team.id}')"><span class="material-symbols-rounded">logout</span> Leave Team</button>`;
+            }
+            actions.innerHTML = html;
+        }
+
+        // 7. Destructive Action Modals
+        function promptRemoveMember(studentId, studentName) {
+            showModal(
+                "Remove Member", 
+                `Are you sure you want to kick ${studentName} from the team?`, 
+                "btn-danger", "person_remove", "warning",
+                async () => {
+                    const { error } = await supabaseClient.from('team_members').delete().eq('student_id', studentId);
+                    if (error) showToast(error.message);
+                }
+            );
+        }
+
+        function promptLockTeam(teamId) {
+            showModal(
+                "Lock Team", 
+                "This will register your team permanently. You cannot remove or add members after this. Ready?", 
+                "btn-primary", "lock", "info",
+                async () => {
+                    const { error } = await supabaseClient.rpc('lock_team', { p_team_id: teamId, p_captain_id: user.id });
+                    if (error) showToast(error.message);
+                    else {
+                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#0b57d0', '#146C2E', '#A8C7FA'] });
+                        await loadMyTeam(teamId);
+                    }
+                }
+            );
+        }
+
+        function promptLeaveTeam(teamId) {
+            showModal(
+                "Leave Team", 
+                "Are you sure you want to leave? You will have to join another team to participate.", 
+                "btn-danger", "logout", "warning",
+                async () => {
+                    const { error } = await supabaseClient.from('team_members').delete().eq('student_id', user.id);
+                    if (error) showToast(error.message);
+                    else init();
+                }
+            );
+        }
+
+        function promptDeleteTeam(teamId) {
+            showModal(
+                "Delete Team", 
+                "This will kick all members and permanently delete the team. This action cannot be undone.", 
+                "btn-danger", "delete_forever", "warning",
+                async () => {
+                    const { error } = await supabaseClient.from('teams').delete().match({ id: teamId, captain_id: user.id });
+                    if (error) showToast(error.message);
+                    else init();
+                }
+            );
+        }
+
+        init();
+    </script>
+</body>
+</html>

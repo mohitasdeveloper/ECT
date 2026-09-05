@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+    <title>Log In - ECampus</title>
+
+    <link rel="icon" type="image/png" href="https://i.ibb.co/394HcGWn/Eco-Birla-3-modified.png">
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Courgette&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" rel="stylesheet" />
+
+    <!-- SUPABASE IMPORT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Tailwind Config to match your main app -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-surface-variant": "#3f4a3c",
+                        "surface-container-lowest": "#ffffff",
+                        "surface": "#f8f9fa",
+                        "primary": "#006e1c",
+                        "on-surface": "#191c1d",
+                        "surface-variant": "#e1e3e4",
+                        "error": "#ba1a1a",
+                    },
+                    fontFamily: { sans: ["Inter", "sans-serif"] }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer components {
+            .input-field {
+                @apply w-full bg-surface-variant/20 dark:bg-neutral-900/50 border border-surface-variant/50 dark:border-neutral-700 rounded-xl p-3.5 text-[15px] font-medium text-on-surface dark:text-gray-100 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder-on-surface-variant/50 dark:placeholder-gray-500;
+            }
+            .input-label {
+                @apply text-[11px] font-bold text-on-surface-variant dark:text-gray-400 uppercase tracking-wider mb-1.5 block ml-1;
+            }
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+
+<body class="bg-surface dark:bg-[#121212] text-on-surface dark:text-gray-100 antialiased min-h-[100dvh] flex flex-col items-center justify-center py-10 px-5 fade-in">
+
+    <!-- Desktop Card Wrapper -->
+    <div class="w-full max-w-md sm:bg-surface-container-lowest sm:dark:bg-[#1e1e1e] sm:shadow-2xl sm:p-8 sm:rounded-[32px] sm:border sm:border-surface-variant/40 sm:dark:border-neutral-800">
+        
+        <!-- Header / Logo -->
+        <div class="w-full flex flex-col items-center mb-8 mt-2 text-center">
+            <img src="https://i.ibb.co/394HcGWn/Eco-Birla-3-modified.png" class="w-20 h-20 mx-auto mb-3" alt="EcoBirla Logo">
+            <span style="font-family:'Courgette',cursive;" class="text-[52px] leading-tight bg-gradient-to-r from-[#00C853] via-[#00A2FF] to-[#2962FF] bg-clip-text text-transparent select-none mb-3 drop-shadow-sm pb-1">
+                ECampus
+            </span>
+            <h1 class="text-3xl font-extrabold tracking-tight text-on-surface dark:text-gray-100 mb-2">Welcome Back!</h1>
+            <p class="text-[15px] font-medium text-on-surface-variant dark:text-gray-400">Please sign in to continue</p>
+        </div>
+
+        <!-- Auth Message Banner -->
+        <div id="auth-message" class="w-full text-center mb-4 h-5 flex items-center justify-center font-bold text-sm text-error empty:hidden"></div>
+
+     <!-- Login Form -->
+        <form id="login-form" class="w-full flex flex-col gap-5">
+            <!-- Identifier -->
+            <div>
+                <label for="login-identifier" class="input-label">Email or Student ID</label>
+                <input type="text" id="login-identifier" class="input-field" placeholder="student@college.edu or 123456" required>
+            </div>
+
+            <!-- Password -->
+            <div>
+                <label for="login-password" class="input-label">Password</label>
+                <input type="password" id="login-password" class="input-field" placeholder="••••••••" required>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="mt-4">
+                <button type="submit" id="login-button" class="w-full bg-primary text-white py-4 rounded-xl font-extrabold text-[16px] active:scale-95 transition-all shadow-lg shadow-primary/25 flex justify-center items-center">
+                    <span class="btn-text">Log In</span>
+                    <span class="material-symbols-outlined hidden animate-spin ml-2">progress_activity</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- REACTIVATION SCREEN (Hidden by default) -->
+        <div id="reactivate-container" class="hidden flex-col items-center justify-center text-center animate-fadeIn w-full py-4">
+            <div class="w-16 h-16 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <span class="material-symbols-outlined text-[32px]">manage_accounts</span>
+            </div>
+            <h2 class="text-2xl font-extrabold text-on-surface dark:text-gray-100 mb-2">Account Deactivated</h2>
+            <p class="text-[13px] text-on-surface-variant dark:text-gray-400 mb-6 px-4">Your account is currently deactivated. Would you like to reactivate it and restore your profile?</p>
+            
+            <button id="reactivate-btn" class="w-full bg-primary text-white py-3.5 rounded-xl text-[15px] font-bold active:scale-95 transition-transform shadow-md shadow-primary/20 mb-3">
+                Yes, Reactivate Account
+            </button>
+            <button id="cancel-reactivate-btn" class="w-full bg-surface-variant/50 dark:bg-neutral-800 text-on-surface dark:text-gray-100 py-3.5 rounded-xl text-[15px] font-bold active:scale-95 transition-transform">
+                Cancel & Logout
+            </button>
+        </div>
+
+        <!-- Footer Links -->
+        <div class="w-full text-center mt-8 pb-2">
+            <p class="text-[14px] font-medium text-on-surface-variant dark:text-gray-400">
+                Don't have an account? <a href="signup.html" class="font-extrabold text-primary hover:underline hover:text-primary/80 transition-colors ml-1">Sign Up</a>
+            </p>
+        </div>
+        
+        <p class="text-center text-[12px] font-medium text-on-surface-variant/70 dark:text-gray-500 mt-6">
+            Having trouble? Contact EcoSquad for Support.
+        </p>
+    </div>
+
+    <!-- Script loading -->
+    <script type="module" src="login.js"></script>
+    <script>
+        // Set Theme on Load to perfectly match app state
+        const isDarkMode = localStorage.getItem('theme') === 'dark';
+        document.documentElement.classList.toggle('dark', isDarkMode);
+    </script>
+</body>
+</html>

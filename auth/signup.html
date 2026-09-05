@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+    <title>Sign Up - ECampus</title>
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Courgette&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" rel="stylesheet" />
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-surface-variant": "#3f4a3c",
+                        "surface-container-lowest": "#ffffff",
+                        "surface": "#f8f9fa",
+                        "primary": "#006e1c",
+                        "on-surface": "#191c1d",
+                        "surface-variant": "#e1e3e4",
+                        "error": "#ba1a1a",
+                    },
+                    fontFamily: { sans: ["Inter", "sans-serif"] }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer components {
+            .input-field {
+                @apply w-full bg-surface-variant/20 dark:bg-neutral-900/50 border border-surface-variant/50 dark:border-neutral-700 rounded-xl p-3.5 text-[15px] font-medium text-on-surface dark:text-gray-100 outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder-on-surface-variant/50 dark:placeholder-gray-500;
+            }
+            .input-label {
+                @apply text-[11px] font-bold text-on-surface-variant dark:text-gray-400 uppercase tracking-wider mb-1.5 block ml-1;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-surface dark:bg-[#121212] text-on-surface dark:text-gray-100 antialiased min-h-screen flex flex-col items-center py-10 px-5">
+
+    <div class="w-full max-w-md sm:bg-surface-container-lowest sm:dark:bg-[#1e1e1e] sm:shadow-2xl sm:p-8 sm:rounded-[32px] sm:border sm:border-surface-variant/40 sm:dark:border-neutral-800">
+        
+        <div class="w-full flex flex-col items-center mb-10 mt-2">
+            <span style="font-family:'Courgette',cursive;" class="text-[52px] leading-tight bg-gradient-to-r from-[#00C853] via-[#00A2FF] to-[#2962FF] bg-clip-text text-transparent select-none mb-3 drop-shadow-sm pb-1">
+                ECampus
+            </span>
+            <h1 class="text-3xl font-extrabold tracking-tight text-on-surface dark:text-gray-100 mb-2">Create an Account</h1>
+            <p class="text-[15px] font-medium text-on-surface-variant dark:text-gray-400">Join your campus network</p>
+        </div>
+
+        <div id="auth-message" class="w-full text-center mb-2 h-6 flex items-center justify-center font-medium"></div>
+
+        <form id="signup-form" class="w-full flex flex-col gap-5">
+            
+            <div>
+                <label class="input-label">College</label>
+                <select id="signup-college" class="input-field opacity-60 bg-gray-100 dark:bg-neutral-800 cursor-not-allowed pointer-events-none appearance-none" disabled>
+                    </select>
+            </div>
+
+            <div id="other-college-container" class="hidden"></div>
+
+            <div>
+                <label class="input-label">Full Name</label>
+                <input type="text" id="signup-fullname" class="input-field" placeholder="John Doe" required>
+            </div>
+
+            <div>
+                <label class="input-label">Email</label>
+                <input type="email" id="signup-email" class="input-field" placeholder="mohitmali@gmail.com" required>
+            </div>
+
+            <div>
+                <label class="input-label">Password</label>
+                <input type="password" id="signup-password" class="input-field" placeholder="••••••••" required minlength="6">
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <label class="input-label">Student ID</label>
+                    <input type="text" id="signup-studentid" class="input-field" placeholder="12345678" required>
+                </div>
+
+                <div class="relative cursor-pointer" onclick="openSignupGenderPicker()">
+                    <label class="input-label">Gender</label>
+                    <input type="text" id="signup-gender" readonly class="input-field pointer-events-none" placeholder="Select" required>
+                    <span class="material-symbols-outlined absolute right-3 top-[34px] text-on-surface-variant pointer-events-none">chevron_right</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-5">
+                <div class="relative cursor-pointer" onclick="openSignupCoursePicker()">
+                    <label class="input-label">Course</label>
+                    <input type="text" id="signup-course" readonly class="input-field pointer-events-none" placeholder="Select" required>
+                    <span class="material-symbols-outlined absolute right-3 top-[34px] text-on-surface-variant pointer-events-none">chevron_right</span>
+                </div>
+
+                <div>
+                    <label class="input-label">Mobile</label>
+                    <input type="tel" id="signup-mobile" class="input-field" placeholder="+91 98765..." required>
+                </div>
+            </div>
+
+            <!-- New Checkbox Added Here -->
+            <div class="flex items-start gap-3 mt-1">
+                <input type="checkbox" id="signup-terms" class="mt-0.5 w-4 h-4 text-primary bg-surface-variant/20 dark:bg-neutral-900/50 border border-surface-variant/50 dark:border-neutral-700 rounded focus:ring-primary focus:ring-1 outline-none cursor-pointer shrink-0" required>
+                <label for="signup-terms" class="text-[13px] font-medium text-on-surface-variant dark:text-gray-400 leading-snug">
+                    I confirm that I am over 16 years of age and agree to the 
+                    <a href="https://ecampus.mohitmali.in/privacy.html" target="_blank" class="text-primary hover:underline font-bold">Privacy Policy</a> & 
+                    <a href="https://ecampus.mohitmali.in/terms.html" target="_blank" class="text-primary hover:underline font-bold">Terms</a>.
+                </label>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" id="signup-button" class="w-full bg-primary text-white py-4 rounded-xl font-extrabold text-[16px] active:scale-95 transition-all shadow-lg shadow-primary/25 flex justify-center items-center">
+                    <span class="btn-text">Create Account</span>
+                    <span class="material-symbols-outlined hidden animate-spin">progress_activity</span>
+                </button>
+            </div>
+        </form>
+
+        <div class="w-full text-center mt-8 pb-4">
+            <p class="text-[14px] font-medium text-on-surface-variant dark:text-gray-400">
+                Already have an account? <a href="login.html" class="font-extrabold text-primary hover:underline hover:text-primary/80 transition-colors ml-1">Log In</a>
+            </p>
+        </div>
+    </div>
+
+
+    <div id="modal-signup-course-picker" class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm hidden flex-col justify-end transition-opacity">
+        <div class="bg-surface dark:bg-[#1e1e1e] w-full max-w-md mx-auto rounded-t-[32px] p-6 pb-8 relative animate-[slideUp_0.3s_ease-out] flex flex-col max-h-[85vh] shadow-[0_-10px_60px_rgba(0,0,0,0.5)]">
+            <button type="button" onclick="closeSignupCoursePicker()" class="absolute top-4 right-5 w-8 h-8 bg-surface-variant/50 dark:bg-neutral-800 rounded-full flex items-center justify-center text-on-surface dark:text-gray-100 active:scale-95 transition-transform">
+                <span class="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            <h3 class="text-xl font-extrabold text-on-surface dark:text-gray-100 shrink-0 mb-4">Select Course</h3>
+            
+            <div class="flex-1 overflow-y-auto pr-2 hide-scrollbar">
+                <div class="mb-6">
+                    <h4 class="text-[12px] font-bold text-primary uppercase tracking-wider mb-2 sticky top-0 bg-surface dark:bg-[#1e1e1e] py-1 z-10">First Year (FY)</h4>
+                    <div class="space-y-1">
+                        <button type="button" onclick="selectSignupCourse('FY B.A')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.A</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Sc')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Sc</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Com')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Com</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Com (Management Studies)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Com (Management Studies)</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Com (Accounting & Finance)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Com (Accounting & Finance)</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Com (Financial Markets)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Com (Financial Markets)</button>
+                        <button type="button" onclick="selectSignupCourse('FY B.Sc (Computer Science)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">FY B.Sc (Computer Science)</button>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h4 class="text-[12px] font-bold text-primary uppercase tracking-wider mb-2 sticky top-0 bg-surface dark:bg-[#1e1e1e] py-1 z-10">Second Year (SY)</h4>
+                    <div class="space-y-1">
+                        <button type="button" onclick="selectSignupCourse('SY B.A.')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.A.</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Sc')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Sc</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Com')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Com</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Com (Management Studies)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Com (Management Studies)</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Com (Accounting & Finance)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Com (Accounting & Finance)</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Com (Financial Markets)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Com (Financial Markets)</button>
+                        <button type="button" onclick="selectSignupCourse('SY B.Sc (Computer Science)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">SY B.Sc (Computer Science)</button>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <h4 class="text-[12px] font-bold text-primary uppercase tracking-wider mb-2 sticky top-0 bg-surface dark:bg-[#1e1e1e] py-1 z-10">Third Year (TY)</h4>
+                    <div class="space-y-1">
+                        <button type="button" onclick="selectSignupCourse('TY B.A')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.A</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Sc')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Sc</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Com')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Com</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Com (Management Studies)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Com (Management Studies)</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Com (Accounting & Finance)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Com (Accounting & Finance)</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Com (Financial Markets)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Com (Financial Markets)</button>
+                        <button type="button" onclick="selectSignupCourse('TY B.Sc (Computer Science)')" class="w-full text-left px-4 py-3 rounded-xl text-[15px] font-medium text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors">TY B.Sc (Computer Science)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-signup-gender-picker" class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm hidden flex-col justify-end transition-opacity">
+        <div class="bg-surface dark:bg-[#1e1e1e] w-full max-w-md mx-auto rounded-t-[32px] p-6 pb-8 relative animate-[slideUp_0.3s_ease-out] flex flex-col shadow-[0_-10px_60px_rgba(0,0,0,0.5)]">
+            <button type="button" onclick="closeSignupGenderPicker()" class="absolute top-4 right-5 w-8 h-8 bg-surface-variant/50 dark:bg-neutral-800 rounded-full flex items-center justify-center text-on-surface dark:text-gray-100 active:scale-95 transition-transform">
+                <span class="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            <h3 class="text-xl font-extrabold text-on-surface dark:text-gray-100 shrink-0 mb-6">Select Gender</h3>
+            
+            <div class="space-y-3">
+                <button type="button" onclick="selectSignupGender('Male')" class="w-full text-left px-5 py-4 rounded-xl text-[15px] font-bold text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors border border-surface-variant/50 dark:border-neutral-700 flex items-center justify-between">
+                    Male
+                    <span class="material-symbols-outlined text-primary text-[22px]">male</span>
+                </button>
+                <button type="button" onclick="selectSignupGender('Female')" class="w-full text-left px-5 py-4 rounded-xl text-[15px] font-bold text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors border border-surface-variant/50 dark:border-neutral-700 flex items-center justify-between">
+                    Female
+                    <span class="material-symbols-outlined text-pink-500 text-[22px]">female</span>
+                </button>
+                <button type="button" onclick="selectSignupGender('Other')" class="w-full text-left px-5 py-4 rounded-xl text-[15px] font-bold text-on-surface dark:text-gray-100 hover:bg-surface-variant/30 dark:hover:bg-neutral-800 active:bg-surface-variant/50 transition-colors border border-surface-variant/50 dark:border-neutral-700 flex items-center justify-between">
+                    Other
+                    <span class="material-symbols-outlined text-purple-500 text-[22px]">transgender</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="signup.js"></script>
+    <script>
+        // Set Theme on Load
+        const isDarkMode = localStorage.getItem('theme') === 'dark';
+        document.documentElement.classList.toggle('dark', isDarkMode);
+    </script>
+</body>
+</html>

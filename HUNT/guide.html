@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Registration Guide - Treasure Hunt</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+    
+    <style>
+        :root {
+            /* Material 3 Light Theme */
+            --bg-color: #F0F4F8;
+            --surface-color: #FFFFFF;
+            --surface-container: #F1F3F4;
+            --primary-color: #0B57D0;
+            --primary-hover: #0842A0;
+            --on-primary: #FFFFFF;
+            --primary-container: #D3E3FD;
+            --on-primary-container: #041E49;
+            --text-primary: #1F1F1F;
+            --text-secondary: #444746;
+            --border-color: #E0E2E0;
+            --danger-color: #B3261E;
+            --success-color: #146C2E;
+            --shadow-elevation: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="dark"] {
+            /* Material 3 Dark Theme */
+            --bg-color: #131314;
+            --surface-color: #1E1F20;
+            --surface-container: #2D2F31;
+            --primary-color: #A8C7FA;
+            --primary-hover: #D3E3FD;
+            --on-primary: #000000;
+            --primary-container: #004A77;
+            --on-primary-container: #C2E7FF;
+            --text-primary: #E3E3E3;
+            --text-secondary: #C4C7C5;
+            --border-color: #444746;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            /* Added spacing for mobile status bar */
+            padding: calc(env(safe-area-inset-top, 24px) + 24px) 0 16px 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 0 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Material 3 Cards */
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow-elevation);
+            border: 1px solid var(--border-color);
+        }
+
+        h1, h2 { font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+        p { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; line-height: 1.6; }
+
+        /* Step Instructions */
+        .step-container {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .step-container:last-child {
+            margin-bottom: 0;
+        }
+        .step-icon {
+            background: var(--primary-container);
+            color: var(--primary-color);
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .step-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .step-content p {
+            margin-bottom: 0;
+        }
+
+        /* Important Note Box */
+        .alert-box {
+            background: var(--surface-container);
+            border-left: 4px solid var(--danger-color);
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        .alert-box h4 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--danger-color);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        /* Buttons */
+        button {
+            width: 100%;
+            padding: 16px;
+            border-radius: 100px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .btn-primary { background-color: var(--primary-color); color: var(--on-primary); }
+        .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .back-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 8px;
+            width: auto;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .back-btn:hover {
+            background: var(--surface-container);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <!-- Header -->
+        <div class="header-nav">
+            <button class="back-btn" onclick="goToRegistration()" aria-label="Go Back">
+                <span class="material-symbols-rounded">arrow_back</span>
+            </button>
+            <h1 style="margin: 0; font-size: 22px;">How to Register</h1>
+        </div>
+
+        <!-- Guide Card -->
+        <div class="card">
+            <h2 style="font-size: 20px; margin-bottom: 24px;">Registration Rules</h2>
+
+            <!-- Step 1 -->
+            <div class="step-container">
+                <div class="step-icon">
+                    <span class="material-symbols-rounded">group_add</span>
+                </div>
+                <div class="step-content">
+                    <h3>1. Form a Team</h3>
+                    <p>One person must click <strong>"Create Team"</strong>. This person automatically becomes the <strong>Leader</strong> of the squad.</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-container">
+                <div class="step-icon">
+                    <span class="material-symbols-rounded">search</span>
+                </div>
+                <div class="step-content">
+                    <h3>2. Invite Members</h3>
+                    <p>Tell your friends your exact Team Name. They need to search for it in the lobby and click <strong>"Join"</strong>.</p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-container">
+                <div class="step-icon">
+                    <span class="material-symbols-rounded">lock</span>
+                </div>
+                <div class="step-content">
+                    <h3>3. Submit & Lock</h3>
+                    <p>Once you have <strong>exactly 5 members</strong>, the Leader must click "Submit & Lock Team". Your spot is NOT secured until the team is locked!</p>
+                </div>
+            </div>
+
+            <!-- Warning Box -->
+            <div class="alert-box">
+                <h4><span class="material-symbols-rounded" style="font-size: 18px;">warning</span> Important Rules</h4>
+                <ul style="padding-left: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                    <li>Only the first <strong>10 Locked Teams</strong> will be allowed to play.</li>
+                    <li>You cannot be a member of more than one team at a time.</li>
+                    <li>Once a team is locked, nobody can leave and the Leader cannot kick anyone.</li>
+                </ul>
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="goToRegistration()">
+            <span class="material-symbols-rounded">sports_esports</span>
+            Continue to Registration
+        </button>
+
+    </div>
+
+    <script>
+        // 1. Read URL Params to maintain theme & user session
+        const urlParams = new URLSearchParams(window.location.search);
+        const theme = urlParams.get('theme') || 'light';
+
+        // Apply theme immediately
+        if (theme === 'dark') document.body.setAttribute('data-theme', 'dark');
+
+        // 2. Navigation Logic (Adding 5489 to ID & pointing to specific URL)
+        function goToRegistration() {
+            // Get current params
+            const params = new URLSearchParams(window.location.search);
+            const currentId = params.get('student_id');
+
+            // If ID exists, parse it, add 5489, and update the parameter
+            if (currentId) {
+                const newId = parseInt(currentId, 10) + 5489;
+                params.set('student_id', newId);
+            }
+
+            // Redirect to the exact URL provided
+            window.location.href = 'https://ecampus-android.mohitmali.in/HUNT/regi.html?' + params.toString();
+        }
+    </script>
+</body>
+</html>
