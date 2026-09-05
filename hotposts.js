@@ -79,6 +79,17 @@ let isRecording = false;
 let videoZoomScale = 1;
 let initialVideoPinchDist = 0;
 
+// 🚀 NEW: Live render canvas — this is what's actually shown AND recorded,
+// so pinch-zoom is baked into real pixels instead of a cosmetic CSS transform.
+let renderCanvas = null;
+let renderCtx = null;
+let liveRenderLoopId = null;
+let recordedMimeType = 'video/webm';
+
+// 🚀 NEW: sound state. Instagram-style: default unmuted, remembered for the session,
+// falls back to muted (with a "tap for sound" hint) only if the browser blocks autoplay.
+let viewerMuted = false;
+
 let imgTransform = { scale: 1, x: 0, y: 0 }; 
 let isDraggingBg = false;
 let bgDragStartX = 0, bgDragStartY = 0;
@@ -197,6 +208,14 @@ function setupEventListeners() {
     setupViewerTouchPhysics();
 
     document.getElementById('close-hotpost-viewer-btn')?.addEventListener('click', closeHotpostViewer);
+    document.getElementById('hotpost-viewer-mute-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const vidEl = document.getElementById('hotpost-viewer-video');
+        vidEl.muted = !vidEl.muted;
+        viewerMuted = vidEl.muted; // remember the choice for the rest of this viewing session
+        e.currentTarget.querySelector('span').textContent = vidEl.muted ? 'volume_off' : 'volume_up';
+        if (!vidEl.muted) document.getElementById('hotpost-tap-for-sound')?.classList.add('hidden');
+    });
     document.getElementById('hotpost-reply-btn')?.addEventListener('click', handleReplyToHotpost);
     document.getElementById('hotpost-like-btn')?.addEventListener('click', handleLikeHotpost);
 
@@ -368,7 +387,9 @@ function setupEventListeners() {
         }
 
         if (file.type.startsWith('video/')) {
-            if (file.size > 30 * 1024 * 1024) return showToast('Video is too large (max 30MB)', 'error');
+            // 🚀 FIX: 30MB was rejecting completely ordinary phone clips. Cloudinary's free-plan
+            // unsigned upload ceiling is ~100MB — cap there instead, matching what will actually work.
+            if (file.size > 100 * 1024 * 1024) return showToast('Video is too large (max 100MB). Try a shorter clip.', 'error');
             
             currentMediaType = 'video';
             currentPhotoBlob = file;
@@ -379,8 +400,8 @@ function setupEventListeners() {
             
             // 🚀 FIX: Use onloadeddata for strict mobile compatibility instead of metadata
             videoEl.onloadeddata = () => {
-                videoEl.play().catch(err => console.error("Gallery playback blocked:", err));
                 showPreviewUI();
+                playWithSoundFallback(videoEl, 'hotpost-mute-btn');
                 initDoodleCanvas();
             };
         } else {
@@ -486,15 +507,70 @@ async function openCameraModal() {
         video.muted = true; 
         
         videoZoomScale = 1;
-        video.style.transform = currentFacingMode === 'user' ? `scaleX(-1) scale(${videoZoomScale})` : `scale(${videoZoomScale})`;
+        isHardwareZoomActive = false;
+
+        // 🚀 NEW: draw the (possibly digitally-zoomed) camera feed onto a canvas every frame.
+        // This canvas is what's shown on screen AND what gets recorded, so zoom is real pixels,
+        // not a CSS transform that used to get thrown away the moment you hit record.
+        renderCanvas = document.getElementById('hotpost-camera-canvas');
+        renderCtx = renderCanvas.getContext('2d');
+        await new Promise(resolve => { video.onloadedmetadata = resolve; });
+        startLiveRenderLoop(video);
     } catch (err) {
         showToast('Camera or Microphone access denied.', 'error');
         closeCameraModal(true);
     }
 }
 
+// 🚀 NEW: continuously draws the raw camera video onto the visible canvas, applying
+// digital zoom (crop+scale) and mirroring so what you see is exactly what gets captured/recorded.
+function startLiveRenderLoop(sourceVideo) {
+    if (liveRenderLoopId) cancelAnimationFrame(liveRenderLoopId);
+
+    const draw = () => {
+        if (!renderCanvas || !sourceVideo.videoWidth) {
+            liveRenderLoopId = requestAnimationFrame(draw);
+            return;
+        }
+        const vw = sourceVideo.videoWidth, vh = sourceVideo.videoHeight;
+        if (renderCanvas.width !== vw || renderCanvas.height !== vh) {
+            renderCanvas.width = vw;
+            renderCanvas.height = vh;
+        }
+
+        renderCtx.save();
+        renderCtx.clearRect(0, 0, vw, vh);
+
+        // Hardware zoom already changes the physical sensor frame, so just draw it as-is.
+        // Software zoom (no hardware capability) crops a smaller centered rectangle and
+        // scales it up to fill the canvas — a real pixel-level zoom, not a CSS trick.
+        let sx = 0, sy = 0, sw = vw, sh = vh;
+        if (!isHardwareZoomActive && videoZoomScale > 1) {
+            sw = vw / videoZoomScale;
+            sh = vh / videoZoomScale;
+            sx = (vw - sw) / 2;
+            sy = (vh - sh) / 2;
+        }
+
+        if (currentFacingMode === 'user') {
+            renderCtx.translate(vw, 0);
+            renderCtx.scale(-1, 1);
+        }
+        renderCtx.drawImage(sourceVideo, sx, sy, sw, sh, 0, 0, vw, vh);
+        renderCtx.restore();
+
+        liveRenderLoopId = requestAnimationFrame(draw);
+    };
+    liveRenderLoopId = requestAnimationFrame(draw);
+}
+
 function closeCameraModal(force = false) {
     const modal = document.getElementById('modal-hotpost-camera');
+
+    if (liveRenderLoopId) {
+        cancelAnimationFrame(liveRenderLoopId);
+        liveRenderLoopId = null;
+    }
     
     // IMPROVED: Cleanup camera stream properly
     if (currentCameraStream) {
@@ -546,35 +622,51 @@ function switchCamera() {
 }
 
 function setupVideoZoomPhysics() {
-    const video = document.getElementById('hotpost-camera-feed');
+    // 🚀 FIX: these listeners used to live on the raw <video>, which is now pointer-events-none
+    // (the visible/recordable surface is the canvas) — attach to the canvas instead.
+    const canvas = document.getElementById('hotpost-camera-canvas');
     let initialY = 0;
     let initialZoom = 1;
     let lastTapTime = 0; // 🚀 For tracking double-taps
+    let lastTouchCount = 0;
 
     const getPinchDistance = (touches) => {
         return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     };
 
-    video.addEventListener('touchstart', (e) => {
+    // 🚀 FIX: re-anchor the gesture baseline whenever the finger count changes mid-gesture
+    // (e.g. lifting one finger after a pinch to keep panning with the other). Previously the
+    // baseline stayed stuck at whatever it was from the very first touch, so zoom would jump.
+    const recalibrate = (touches) => {
+        if (touches.length === 2) {
+            initialVideoPinchDist = getPinchDistance(touches);
+            initialZoom = videoZoomScale;
+        } else if (touches.length === 1) {
+            initialY = touches[0].clientY;
+            initialZoom = videoZoomScale;
+        }
+    };
+
+    canvas.addEventListener('touchstart', (e) => {
         if (document.getElementById('preview-ui').classList.contains('hidden')) {
-            if (e.touches.length === 2) {
-                initialVideoPinchDist = getPinchDistance(e.touches);
-            } else if (e.touches.length === 1) {
-                initialY = e.touches[0].clientY;
-                initialZoom = videoZoomScale;
-            }
+            recalibrate(e.touches);
+            lastTouchCount = e.touches.length;
         }
     }, { passive: true });
 
-    video.addEventListener('touchmove', (e) => {
+    canvas.addEventListener('touchmove', (e) => {
         if (document.getElementById('preview-ui').classList.contains('hidden')) {
             if (e.cancelable) e.preventDefault();
 
+            if (e.touches.length !== lastTouchCount) {
+                recalibrate(e.touches);
+                lastTouchCount = e.touches.length;
+                return; // wait for the next move to compute a delta against the new baseline
+            }
+
             if (e.touches.length === 2) {
                 const currentDist = getPinchDistance(e.touches);
-                const scaleChange = currentDist / initialVideoPinchDist;
-                updateCameraZoom(videoZoomScale * scaleChange);
-                initialVideoPinchDist = currentDist;
+                updateCameraZoom(initialZoom * (currentDist / initialVideoPinchDist));
             } else if (e.touches.length === 1) {
                 const currentY = e.touches[0].clientY;
                 const deltaY = initialY - currentY; 
@@ -584,13 +676,17 @@ function setupVideoZoomPhysics() {
     }, { passive: false });
 
     // 🚀 NEW: Double-Tap to Flip Camera Muscle Memory
-    video.addEventListener('touchend', (e) => {
+    canvas.addEventListener('touchend', (e) => {
         if (document.getElementById('preview-ui').classList.contains('hidden')) {
+            lastTouchCount = e.touches.length;
+            if (e.touches.length > 0) recalibrate(e.touches);
+
             const currentTime = new Date().getTime();
             const tapLength = currentTime - lastTapTime;
             
-            // If tapped twice within 300ms
-            if (tapLength < 300 && tapLength > 0 && e.changedTouches.length === 1) {
+            // 🚀 FIX: only counts as a double-tap once ALL fingers are up — otherwise releasing
+            // one finger from a pinch could accidentally flip the camera.
+            if (tapLength < 300 && tapLength > 0 && e.changedTouches.length === 1 && e.touches.length === 0) {
                 switchCamera();
                 if (navigator.vibrate) navigator.vibrate(50); // Haptic tick
             }
@@ -601,10 +697,12 @@ function setupVideoZoomPhysics() {
 
 let isHardwareZoomActive = false;
 
+// 🚀 SIMPLIFIED: the render loop (startLiveRenderLoop) redraws every frame using the
+// current videoZoomScale/isHardwareZoomActive, so this just needs to update that state —
+// no CSS transform to keep in sync, and nothing to "undo" when recording starts anymore.
 function updateCameraZoom(newScale) {
     videoZoomScale = Math.max(1.0, Math.min(4.0, newScale));
-    const video = document.getElementById('hotpost-camera-feed');
-    
+
     if (currentCameraStream) {
         const track = currentCameraStream.getVideoTracks()[0];
         const capabilities = track.getCapabilities ? track.getCapabilities() : {};
@@ -614,53 +712,30 @@ function updateCameraZoom(newScale) {
             const min = capabilities.zoom.min || 1;
             const max = capabilities.zoom.max || 4;
             const targetZoom = min + ((videoZoomScale - 1) / 3) * (max - min);
-            
             track.applyConstraints({ advanced: [{ zoom: targetZoom }] }).catch(e => console.warn(e));
-            
-            // Clear software zoom so it doesn't double-zoom
-            if(video) video.style.transform = currentFacingMode === 'user' ? `scaleX(-1)` : `scale(1)`;
             return;
         }
     }
-    
-    // Fallback: Pure software CSS zoom
     isHardwareZoomActive = false;
-    if(video) {
-        video.style.transform = currentFacingMode === 'user' 
-            ? `scaleX(-1) scale(${videoZoomScale})` 
-            : `scale(${videoZoomScale})`;
-    }
 }
 
 function capturePhoto() {
-    if (!currentCameraStream) return;
+    if (!currentCameraStream || !renderCanvas) return;
 
-    const video = document.getElementById('hotpost-camera-feed');
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-
-    if (currentFacingMode === 'user') {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-    }
-
-    // Capture raw frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob((blob) => {
+    // 🚀 renderCanvas already contains the zoomed + mirrored frame (see startLiveRenderLoop),
+    // so no extra zoom/mirror math is needed here — grab it as-is.
+    renderCanvas.toBlob((blob) => {
         currentPhotoBlob = blob;
         currentMediaType = 'image';
         baseImageObj = new Image();
         baseImageObj.onload = () => {
             const previewImg = document.getElementById('hotpost-preview-img');
             previewImg.src = URL.createObjectURL(blob);
-            
-            // 🚀 Carry over software zoom. If hardware zoom worked, image is ALREADY zoomed (scale 1).
-            const reviewScale = isHardwareZoomActive ? 1 : videoZoomScale;
-            imgTransform = { scale: reviewScale, x: 0, y: 0 };
-            previewImg.style.transform = `translate(0px, 0px) scale(${reviewScale})`;
+
+            // Zoom is already baked into the captured pixels, so the editor starts at scale 1.
+            // (Pinch-zooming further in the editor still works exactly as before.)
+            imgTransform = { scale: 1, x: 0, y: 0 };
+            previewImg.style.transform = `translate(0px, 0px) scale(1)`;
             
             showPreviewUI();
             initDoodleCanvas();
@@ -691,16 +766,11 @@ function startRecording() {
     circle.style.transition = 'stroke-dashoffset 30s linear';
     circle.style.strokeDashoffset = '0';
 
-  // 🚀 STABILITY FIX: Record the raw hardware stream directly. Do not use Canvas capture.
-    let streamToRecord = currentCameraStream;
-
-    // 🚀 FIX: If software zoom was used, reset it for video since it won't be recorded natively!
-    if (!isHardwareZoomActive && videoZoomScale > 1) {
-        videoZoomScale = 1;
-        const video = document.getElementById('hotpost-camera-feed');
-        if (video) video.style.transform = currentFacingMode === 'user' ? `scaleX(-1) scale(1)` : `scale(1)`;
-        import('./ui.js').then(({ showToast }) => showToast('Software zoom is disabled for videos to maintain quality.', 'info'));
-    }
+    // 🚀 FIX: Record from the render canvas (30fps) instead of the raw camera stream, so
+    // whatever zoom you're framing with — hardware OR software — is baked into the actual
+    // recorded pixels. Combined with the real mic audio track from the camera stream.
+    let streamToRecord = renderCanvas.captureStream(30);
+    currentCameraStream.getAudioTracks().forEach(track => streamToRecord.addTrack(track));
 
    // 🚀 FIX: Increased bitrate to 4 Mbps for much higher local video quality
     let options = { mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 4000000 };
@@ -712,6 +782,9 @@ function startRecording() {
     } catch(e) { 
         mediaRecorder = new MediaRecorder(streamToRecord); 
     }
+    // 🚀 NEW: remember the *actual* mimeType we recorded with, so upload filename/extension
+    // and Cloudinary delivery match reality instead of always claiming ".mp4".
+    recordedMimeType = mediaRecorder.mimeType || options.mimeType;
 
     mediaRecorder.ondataavailable = (e) => { 
         if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
@@ -728,13 +801,13 @@ function startRecording() {
         videoEl.src = currentPreviewObjectURL;
         
         videoEl.onloadeddata = () => {
-            // Apply the software zoom purely via CSS instead of burning it into the file
-            const reviewScale = isHardwareZoomActive ? 1 : videoZoomScale;
-            imgTransform = { scale: reviewScale, x: 0, y: 0 };
-            videoEl.style.transform = `translate(0px, 0px) scale(${reviewScale})`;
-             
-            videoEl.play().catch(e => console.error("Playback blocked:", e));
+            // Zoom is already baked into the recorded pixels (see startRecording), so the
+            // editor starts flat — further pinch-zoom here still works exactly as before.
+            imgTransform = { scale: 1, x: 0, y: 0 };
+            videoEl.style.transform = `translate(0px, 0px) scale(1)`;
+
             showPreviewUI();
+            playWithSoundFallback(videoEl, 'hotpost-mute-btn');
             initDoodleCanvas();
         }
     };
@@ -781,8 +854,7 @@ function resetCameraUI() {
     currentPhotoBlob = null;
     currentMediaType = 'image'; 
     videoZoomScale = 1;
-    const video = document.getElementById('hotpost-camera-feed');
-    if(video) video.style.transform = currentFacingMode === 'user' ? `scaleX(-1) scale(1)` : `scale(1)`;
+    isHardwareZoomActive = false;
 
     imgTransform = { scale: 1, x: 0, y: 0 };
     const previewImg = document.getElementById('hotpost-preview-img');
@@ -832,6 +904,28 @@ function resetCameraUI() {
         }
     }
 }
+// 🚀 NEW: Instagram-style sound handling — try unmuted first, only fall back to muted
+// if the browser's autoplay policy actually blocks it, and reflect the real state in
+// whatever mute button (if any) belongs to this video element.
+function playWithSoundFallback(videoEl, muteBtnId) {
+    const btn = muteBtnId ? document.getElementById(muteBtnId) : null;
+    const setIcon = (muted) => {
+        if (!btn) return;
+        const span = btn.querySelector('span');
+        if (span) span.textContent = muted ? 'volume_off' : 'volume_up';
+    };
+
+    videoEl.muted = false;
+    const playPromise = videoEl.play();
+    if (!playPromise || typeof playPromise.then !== 'function') { setIcon(false); return; }
+
+    playPromise.then(() => setIcon(false)).catch(() => {
+        videoEl.muted = true;
+        setIcon(true);
+        videoEl.play().catch(e => console.error('Playback blocked even muted:', e));
+    });
+}
+
 function showPreviewUI() {
     document.getElementById('hotpost-camera-feed').classList.add('hidden');
     document.getElementById('hotpost-preview-container').classList.remove('hidden');
@@ -847,11 +941,11 @@ function showPreviewUI() {
         const vidEl = document.getElementById('hotpost-preview-video');
         vidEl.classList.remove('hidden');
         
-        // 🚀 FIX: Start muted so iOS/Android WebViews allow autoplay!
-        vidEl.muted = true;
+        // 🚀 Default to unmuted (matches Instagram); playWithSoundFallback only mutes if the
+        // browser's autoplay policy actually blocks unmuted playback.
         const muteBtn = document.getElementById('hotpost-mute-btn');
         muteBtn.classList.remove('hidden');
-        muteBtn.querySelector('span').textContent = 'volume_off';
+        muteBtn.querySelector('span').textContent = 'volume_up';
     } else {
         document.getElementById('hotpost-preview-video').classList.add('hidden');
         document.getElementById('hotpost-preview-img').classList.remove('hidden');
@@ -1130,6 +1224,7 @@ function setupEditorTouchPhysics() {
     let startX = 0, startY = 0;
     let widgetCenterX = 0, widgetCenterY = 0;
     let hasMovedSignificantly = false; // 🚀 NEW: Touch tolerance
+    let lastBgTouchCount = 0; // 🚀 FIX: lets pinch-zoom hand off to single-finger pan mid-gesture
 
     const getPinchDistance = (touches) => {
         return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
@@ -1218,6 +1313,7 @@ function setupEditorTouchPhysics() {
             touchMode = 'zoom_bg';
             initialPinchDist = getPinchDistance(e.touches);
             initialBgScale = imgTransform.scale;
+            lastBgTouchCount = 2;
             return;
         }
 
@@ -1227,6 +1323,7 @@ function setupEditorTouchPhysics() {
             touchMode = imgTransform.scale > 1.0 ? 'pan_bg' : 'swipe';
             bgDragStartX = startX;
             bgDragStartY = startY;
+            lastBgTouchCount = 1;
         }
     }, { passive: false });
 
@@ -1237,6 +1334,25 @@ function setupEditorTouchPhysics() {
         const currentX = e.touches[0].clientX;
         const currentY = e.touches[0].clientY;
         const rect = container.getBoundingClientRect();
+
+        // 🚀 FIX: pinch-zooming the background and lifting (or adding) a finger mid-gesture
+        // used to freeze — the mode was set once at touchstart and never revisited. Hand off
+        // between zoom_bg and pan_bg live instead of requiring a full release + re-touch.
+        if ((touchMode === 'zoom_bg' || touchMode === 'pan_bg' || touchMode === 'swipe') && e.touches.length !== lastBgTouchCount) {
+            if (e.touches.length === 2) {
+                touchMode = 'zoom_bg';
+                initialPinchDist = getPinchDistance(e.touches);
+                initialBgScale = imgTransform.scale;
+            } else if (e.touches.length === 1) {
+                touchMode = imgTransform.scale > 1.0 ? 'pan_bg' : 'swipe';
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                bgDragStartX = startX;
+                bgDragStartY = startY;
+            }
+            lastBgTouchCount = e.touches.length;
+            return; // wait for the next move to compute a delta against the new baseline
+        }
 
         // 🚀 NEW: 10px Deadzone to prevent accidental jitter
         if (Math.abs(currentX - startX) > 10 || Math.abs(currentY - startY) > 10) {
@@ -1339,7 +1455,10 @@ function setupEditorTouchPhysics() {
                 else currentFilterIndex = (currentFilterIndex - 1 + FILTER_LIST.length) % FILTER_LIST.length; 
                 
                 const filter = FILTER_LIST[currentFilterIndex];
-                document.getElementById('hotpost-preview-img').style.filter = filter.css;
+                // 🚀 FIX: this used to only ever touch the image element, so swiping
+                // filters on a video preview visibly did nothing.
+                const targetEl = document.getElementById(currentMediaType === 'video' ? 'hotpost-preview-video' : 'hotpost-preview-img');
+                targetEl.style.filter = filter.css;
                 showFilterToast(filter.name);
             }
         }
@@ -1358,6 +1477,117 @@ function showFilterToast(name) {
     toast.style.animation = 'none';
     toast.offsetHeight; 
     toast.style.animation = 'fadeOutUp 1s ease-out forwards';
+}
+
+// 🚀 NEW: pushes live status text ("Processing… 40%", "Uploading… 72%") onto the
+// dashboard's "Uploading..." circle instead of it just spinning with no feedback.
+function setUploadStatusLabel(text) {
+    const label = document.getElementById('hotpost-upload-status-label');
+    if (label) label.textContent = text;
+}
+
+// 🚀 NEW: uploads with real progress (fetch has no upload-progress event; XHR does),
+// so the "Uploading…" circle can show an actual percentage instead of just spinning.
+function uploadToCloudinary(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.error) reject(new Error(data.error.message));
+                else resolve(data);
+            } catch (err) { reject(new Error('Unexpected response from upload server.')); }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload.'));
+        xhr.send(formData);
+    });
+}
+
+// 🚀 NEW: bakes the chosen filter + any editor pinch-zoom/pan into the actual video pixels,
+// the same way photos already get baked — previously these were preview-only and silently
+// dropped at publish time. Only called when the user actually changed something (see caller),
+// so the common case (no filter, no extra zoom) stays on the fast, lossless raw-upload path.
+async function reencodeVideoWithEffects(sourceBlob, screenW, screenH, onProgress) {
+    const sourceVideo = document.createElement('video');
+    sourceVideo.muted = true; // local playback only — captureStream() still carries real audio
+    sourceVideo.playsInline = true;
+    sourceVideo.src = URL.createObjectURL(sourceBlob);
+
+    if (typeof sourceVideo.captureStream !== 'function') {
+        URL.revokeObjectURL(sourceVideo.src);
+        return sourceBlob; // Browser can't do this — fall back to the raw (unfiltered) clip.
+    }
+
+    await new Promise((resolve, reject) => {
+        sourceVideo.onloadedmetadata = resolve;
+        sourceVideo.onerror = () => reject(new Error('Could not read recorded video.'));
+    });
+
+    const MAX_HEIGHT = 1280;
+    const scaleFactor = MAX_HEIGHT / screenH;
+    const finalWidth = Math.round(screenW * scaleFactor);
+    const finalHeight = MAX_HEIGHT;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.filter = FILTER_LIST[currentFilterIndex].css === 'none' ? 'none' : FILTER_LIST[currentFilterIndex].css;
+
+    const vidAspect = sourceVideo.videoWidth / sourceVideo.videoHeight;
+    const screenAspect = finalWidth / finalHeight;
+    let drawW, drawH;
+    if (vidAspect > screenAspect) { drawH = finalHeight; drawW = finalHeight * vidAspect; }
+    else { drawW = finalWidth; drawH = finalWidth / vidAspect; }
+
+    const drawFrame = () => {
+        ctx.save();
+        ctx.translate(finalWidth / 2, finalHeight / 2);
+        ctx.scale(imgTransform.scale, imgTransform.scale);
+        ctx.translate(imgTransform.x * scaleFactor, imgTransform.y * scaleFactor);
+        ctx.drawImage(sourceVideo, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+    };
+
+    const canvasStream = canvas.captureStream(30);
+    sourceVideo.captureStream().getAudioTracks().forEach(t => canvasStream.addTrack(t));
+
+    let options = { mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 4000000 };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm', videoBitsPerSecond: 4000000 };
+    const recorder = new MediaRecorder(canvasStream, options);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+    const resultBlob = await new Promise((resolve, reject) => {
+        let rafId = null;
+        recorder.onstop = () => {
+            cancelAnimationFrame(rafId);
+            URL.revokeObjectURL(sourceVideo.src);
+            resolve(new Blob(chunks, { type: recorder.mimeType }));
+        };
+        recorder.onerror = (e) => reject(e.error || new Error('Re-encode failed.'));
+
+        sourceVideo.onended = () => { if (recorder.state !== 'inactive') recorder.stop(); };
+        sourceVideo.play().then(() => {
+            recorder.start(250);
+            const loop = () => {
+                if (sourceVideo.ended || sourceVideo.paused) return;
+                drawFrame();
+                if (onProgress && sourceVideo.duration) {
+                    onProgress(Math.min(99, Math.round((sourceVideo.currentTime / sourceVideo.duration) * 100)));
+                }
+                rafId = requestAnimationFrame(loop);
+            };
+            loop();
+        }).catch(reject);
+    });
+
+    recordedMimeType = resultBlob.type || recordedMimeType;
+    return resultBlob;
 }
 
 // ==========================================
@@ -1501,26 +1731,48 @@ async function submitHotpost() {
                 overlayForm.append('file', overlayBlob, 'overlay.png');
                 overlayForm.append('upload_preset', CLOUDINARY_HOTPOSTS_PRESET);
 
-                const overRes = await fetch(CLOUDINARY_URL, { method: 'POST', body: overlayForm });
-                const overData = await overRes.json();
-                if (overData.error) throw new Error(overData.error.message);
+                const overData = await uploadToCloudinary(CLOUDINARY_URL, overlayForm);
                 
                 // 🚀 NEW: Save raw URL directly instead of passing to Cloudinary
                 finalOverlayUrl = overData.secure_url; 
             }
 
-         // 2. Upload Video
+            // 🚀 FIX: filter + editor pinch-zoom/pan used to be preview-only and silently
+            // dropped here. Only pay the re-encode cost when something was actually changed —
+            // the common case (no filter, no extra zoom) stays on the fast raw-upload path.
+            const needsReencode = currentFilterIndex !== 0 || imgTransform.scale !== 1 || imgTransform.x !== 0 || imgTransform.y !== 0;
+            let videoBlobToUpload = currentPhotoBlob;
+            if (needsReencode) {
+                setUploadStatusLabel('Processing…');
+                try {
+                    videoBlobToUpload = await reencodeVideoWithEffects(currentPhotoBlob, screenW, screenH, (pct) => {
+                        setUploadStatusLabel(`Processing… ${pct}%`);
+                    });
+                } catch (e) {
+                    console.error('Video re-encode failed, publishing the original clip instead:', e);
+                    videoBlobToUpload = currentPhotoBlob; // Don't block publishing over a cosmetic step.
+                }
+            }
+
+            // 🚀 FIX: filename/extension now matches the blob's real format (recorded webm vs.
+            // a gallery-picked mp4/mov) instead of always hardcoding ".mp4" regardless of content.
+            const actualMime = videoBlobToUpload.type || recordedMimeType || '';
+            const ext = actualMime.includes('webm') ? 'webm' : actualMime.includes('quicktime') ? 'mov' : 'mp4';
+
             const vidForm = new FormData();
-            vidForm.append('file', currentPhotoBlob, 'hotpost.mp4');
+            vidForm.append('file', videoBlobToUpload, `hotpost.${ext}`);
             vidForm.append('upload_preset', CLOUDINARY_HOTPOSTS_PRESET);
             
             const videoUploadUrl = CLOUDINARY_URL.replace('/image/', '/video/');
-            const vidRes = await fetch(videoUploadUrl, { method: 'POST', body: vidForm });
-            const vidData = await vidRes.json();
-            if (vidData.error) throw new Error(vidData.error.message);
+            setUploadStatusLabel('Uploading…');
+            const vidData = await uploadToCloudinary(videoUploadUrl, vidForm, (pct) => {
+                setUploadStatusLabel(`Uploading… ${pct}%`);
+            });
 
-          // 🚀 FIX: Removed aggressive 'eco' compression. 'q_auto' dynamically balances crisp quality and fast loading.
-            finalMediaUrl = vidData.secure_url.replace('/upload/', `/upload/q_auto,vc_auto/`);
+          // 🚀 FIX: Added f_auto (was missing here, though the image path already had it) so
+          // Cloudinary serves each viewer's browser its own best-supported container/codec
+          // instead of always delivering whatever container we happened to record in.
+            finalMediaUrl = vidData.secure_url.replace('/upload/', `/upload/q_auto,vc_auto,f_auto/`);
         } else {
             // ORIGINAL IMAGE BAKE LOGIC
             const finalBlob = await new Promise((resolve, reject) => {
@@ -1571,9 +1823,10 @@ async function submitHotpost() {
             formData.append('file', finalBlob, 'hotpost.webp');
             formData.append('upload_preset', CLOUDINARY_HOTPOSTS_PRESET);
 
-            const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.message);
+            setUploadStatusLabel('Uploading…');
+            const data = await uploadToCloudinary(CLOUDINARY_URL, formData, (pct) => {
+                setUploadStatusLabel(`Uploading… ${pct}%`);
+            });
             
             finalMediaUrl = data.secure_url.replace('/upload/', '/upload/q_auto:eco,f_auto/');
         }
@@ -1604,7 +1857,16 @@ async function submitHotpost() {
 
     } catch (error) {
         console.error("Hotpost Compile Error:", error);
-        showToast('Failed to publish hotpost.', 'error');
+        // 🚀 FIX: one generic toast used to cover network drops, oversized files, and preset
+        // errors alike — surface what actually happened so the user knows whether to retry.
+        const msg = (error && error.message) || '';
+        if (msg.includes('Network error')) {
+            showToast('Upload failed — check your connection and try again.', 'error');
+        } else if (/too large|maximum|file size/i.test(msg)) {
+            showToast('That file is too large to upload.', 'error');
+        } else {
+            showToast('Failed to publish hotpost. Please try again.', 'error');
+        }
     } finally {
         isUploadingBackground = false;
         resetCameraUI(); 
@@ -1761,7 +2023,7 @@ function renderHotpostCircles() {
                     <img src="${currentUser.profile_img_url}" class="w-full h-full object-cover opacity-60">
                 </div>
             </div>
-            <span class="text-[11px] font-bold text-on-surface-variant dark:text-gray-400">Uploading...</span>
+            <span id="hotpost-upload-status-label" class="text-[11px] font-bold text-on-surface-variant dark:text-gray-400">Uploading...</span>
         `;
     } else {
         addCircle.innerHTML = `
@@ -2041,6 +2303,9 @@ function closeHotpostViewer() {
         vidEl.load(); 
     }
 
+    document.getElementById('hotpost-viewer-mute-btn')?.classList.add('hidden');
+    document.getElementById('hotpost-tap-for-sound')?.classList.add('hidden');
+
     const activeBar = document.querySelector('#hotpost-progress-bars .progress-bar-inner.active');
     if (activeBar) activeBar.style.animation = 'none';
     
@@ -2197,7 +2462,30 @@ function playUserStories(userIndex, postIndex = 0) {
             vidEl.style.opacity = '1';
             if (post.caption) overlayEl.style.opacity = '1'; // Show overlay
             recordView(post.id);
-            vidEl.play();
+
+            // 🚀 FIX: default to unmuted (Instagram-style) and remember the choice for the
+            // rest of the session. If the browser actually blocks unmuted autoplay, fall back
+            // to muted and show a "tap for sound" hint instead of silently failing to play.
+            const muteBtn = document.getElementById('hotpost-viewer-mute-btn');
+            const tapHint = document.getElementById('hotpost-tap-for-sound');
+            muteBtn.classList.remove('hidden');
+            tapHint.classList.add('hidden');
+
+            vidEl.muted = viewerMuted;
+            const setIcon = () => { muteBtn.querySelector('span').textContent = vidEl.muted ? 'volume_off' : 'volume_up'; };
+            setIcon();
+
+            const playPromise = vidEl.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(() => {
+                    vidEl.muted = true;
+                    viewerMuted = true;
+                    setIcon();
+                    tapHint.classList.remove('hidden');
+                    vidEl.play().catch(e => console.error('Story playback blocked even muted:', e));
+                });
+            }
+
             if (activeBar) activeBar.classList.add('active');
         };
 
@@ -2215,6 +2503,8 @@ function playUserStories(userIndex, postIndex = 0) {
 
     } else {
         imgEl.classList.remove('hidden');
+        document.getElementById('hotpost-viewer-mute-btn')?.classList.add('hidden');
+        document.getElementById('hotpost-tap-for-sound')?.classList.add('hidden');
         const optimizedUrl = typeof window.optimizeImageUrl === 'function' ? window.optimizeImageUrl(post.media_url, 'hotpost') : post.media_url;
         
         imgEl.onload = () => {
